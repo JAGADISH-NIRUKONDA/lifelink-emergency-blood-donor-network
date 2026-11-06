@@ -6,6 +6,7 @@ import bloodRequestRoutes from './bloodRequest.routes.js';
 import matchingRoutes from './matching.routes.js';
 import invitationRoutes from './invitation.routes.js';
 import notificationRoutes from './notification.routes.js';
+import hospitalRoutes from './hospital.routes.js';
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use('/blood-requests', bloodRequestRoutes);
 router.use('/matching', matchingRoutes);
 router.use('/invitations', invitationRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/hospitals', hospitalRoutes);
 
 export default router;
