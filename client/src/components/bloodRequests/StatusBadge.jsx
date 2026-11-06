@@ -48,6 +48,27 @@ export function StatusBadge({ status }) {
           Rejected
         </span>
       );
+    case 'INVITED':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-800 border border-purple-200">
+          <Clock size={12} className="text-purple-600" />
+          Pending Response
+        </span>
+      );
+    case 'ACCEPTED':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+          <CheckCircle2 size={12} className="text-emerald-600" />
+          Accepted
+        </span>
+      );
+    case 'EXPIRED':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+          <Clock size={12} className="text-amber-500" />
+          Expired
+        </span>
+      );
     case 'CANCELLED':
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
@@ -91,4 +112,7 @@ export function PriorityBadge({ priority }) {
       );
   }
 }
+
+export default StatusBadge;
+
 

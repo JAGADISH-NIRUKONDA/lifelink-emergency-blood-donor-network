@@ -12,6 +12,40 @@ import FinalCTA from './components/FinalCTA';
 import Footer from './components/Footer';
 import ActionModal from './components/ActionModal';
 import BloodRequestPortal from './components/bloodRequests/BloodRequestPortal';
+import NotificationCenterModal from './components/notifications/NotificationCenterModal';
+
+const INITIAL_APP_NOTIFICATIONS = [
+  {
+    _id: 'notif_001',
+    type: 'EMERGENCY_REQUEST',
+    title: '🚨 CRITICAL: O- Donor Needed Urgently',
+    message: 'Metro Trauma Center has requested 3 units of O- blood for emergency trauma surgery.',
+    priority: 'CRITICAL',
+    isRead: false,
+    createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+    data: { requestId: 'BLR-2026-CR88', bloodGroup: 'O-', tab: 'invitations' }
+  },
+  {
+    _id: 'notif_002',
+    type: 'DONOR_INVITATION',
+    title: 'Donation Invitation: A+ Required',
+    message: 'St. Jude General Hospital invited you to donate for scheduled cardiac bypass.',
+    priority: 'HIGH',
+    isRead: false,
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    data: { requestId: 'BLR-2026-AB14', bloodGroup: 'A+', tab: 'invitations' }
+  },
+  {
+    _id: 'notif_003',
+    type: 'DONATION_ACCEPTED',
+    title: 'Donor Accepted: Alex D. (A+)',
+    message: 'A matched voluntary donor has accepted your invitation. Cross-match scheduled.',
+    priority: 'NORMAL',
+    isRead: true,
+    createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+    data: { requestId: 'BLR-2026-AB14', tab: 'hospital' }
+  }
+];
 
 function App() {
   const [modalState, setModalState] = useState({
@@ -22,9 +56,12 @@ function App() {
 
   const [bloodPortalState, setBloodPortalState] = useState({
     isOpen: false,
-    initialTab: 'create', // 'create' | 'history' | 'hospital'
+    initialTab: 'create', // 'create' | 'history' | 'hospital' | 'invitations'
     defaultBloodGroup: 'O+'
   });
+
+  const [notificationCenterOpen, setNotificationCenterOpen] = useState(false);
+  const [notifications, setNotifications] = useState(INITIAL_APP_NOTIFICATIONS);
 
   const openModal = (mode = 'request', defaultBloodGroup = '') => {
     setModalState({
@@ -64,6 +101,7 @@ function App() {
       <Navbar
         onOpenAuthModal={(mode) => openModal(mode || 'login')}
         onOpenBloodPortal={(tab) => openBloodPortal(tab || 'hospital')}
+        onOpenNotificationCenter={() => setNotificationCenterOpen(true)}
       />
 
       <main>
@@ -124,13 +162,32 @@ function App() {
         defaultBloodGroup={modalState.defaultBloodGroup}
       />
 
-      {/* Phase 4: Emergency Blood Request & Hospital Management Portal */}
+      {/* Phase 4 & 5: Emergency Blood Request, Matching & Invitations Portal */}
       <BloodRequestPortal
         key={`${bloodPortalState.isOpen ? 'open' : 'closed'}-${bloodPortalState.initialTab}-${bloodPortalState.defaultBloodGroup}`}
         isOpen={bloodPortalState.isOpen}
         onClose={closeBloodPortal}
         initialTab={bloodPortalState.initialTab}
         defaultBloodGroup={bloodPortalState.defaultBloodGroup}
+      />
+
+      {/* Phase 5: Notification Center Modal */}
+      <NotificationCenterModal
+        isOpen={notificationCenterOpen}
+        onClose={() => setNotificationCenterOpen(false)}
+        notifications={notifications}
+        onMarkAsRead={(id) => {
+          setNotifications((prev) =>
+            prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
+          );
+        }}
+        onMarkAllAsRead={() => {
+          setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+        }}
+        onDeleteNotification={(id) => {
+          setNotifications((prev) => prev.filter((n) => n._id !== id));
+        }}
+        onOpenPortal={(tab) => openBloodPortal(tab)}
       />
     </div>
   );

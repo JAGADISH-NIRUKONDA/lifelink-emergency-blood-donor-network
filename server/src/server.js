@@ -1,8 +1,10 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+import http from 'http';
 import app from './app.js';
 import { connectDB, disconnectDB } from './config/db.js';
+import { initSocketServer } from './sockets/notification.socket.js';
 
 const PORT = process.env.PORT || 5000;
 
@@ -11,9 +13,16 @@ const startServer = async () => {
   try {
     await connectDB();
 
-    const server = app.listen(PORT, () => {
+    const httpServer = http.createServer(app);
+    const allowedOrigins = process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
+      : ['http://localhost:5173', 'http://localhost:3000'];
+
+    initSocketServer(httpServer, allowedOrigins);
+
+    const server = httpServer.listen(PORT, () => {
       console.log('====================================================');
-      console.log(`[Server] LifeLink API running on http://localhost:${PORT}`);
+      console.log(`[Server] LifeLink API & Socket.IO running on http://localhost:${PORT}`);
       console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`[Server] Health Check: http://localhost:${PORT}/api/v1/health`);
       console.log('====================================================');
