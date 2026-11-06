@@ -7,6 +7,7 @@ import matchingRoutes from './matching.routes.js';
 import invitationRoutes from './invitation.routes.js';
 import notificationRoutes from './notification.routes.js';
 import hospitalRoutes from './hospital.routes.js';
+import adminRoutes from './admin.routes.js';
 
 const router = Router();
 
@@ -18,5 +19,6 @@ router.use('/matching', matchingRoutes);
 router.use('/invitations', invitationRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/hospitals', hospitalRoutes);
+router.use('/admin', adminRoutes);
 
 export default router;
