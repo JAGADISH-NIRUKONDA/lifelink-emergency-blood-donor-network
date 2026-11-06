@@ -65,9 +65,27 @@ const userSchema = new mongoose.Schema(
       isAvailable: { type: Boolean, default: true },
       eligibilityStatus: {
         type: String,
-        enum: ['PENDING_SCREENING', 'VERIFIED_ELIGIBLE', 'TEMPORARILY_INELIGIBLE'],
+        enum: [
+          'PENDING_SCREENING',
+          'VERIFIED_ELIGIBLE',
+          'TEMPORARILY_INELIGIBLE',
+          'PERMANENTLY_INELIGIBLE'
+        ],
         default: 'PENDING_SCREENING'
-      }
+      },
+      age: { type: Number, min: 16, max: 100, default: null },
+      weight: { type: Number, min: 30, max: 250, default: null },
+      gender: {
+        type: String,
+        enum: ['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY', ''],
+        default: ''
+      },
+      address: { type: String, trim: true, default: '' },
+      state: { type: String, trim: true, default: '' },
+      postalCode: { type: String, trim: true, default: '' },
+      emergencyContact: { type: String, trim: true, default: '' },
+      totalDonations: { type: Number, min: 0, default: 0 },
+      medicalNotes: { type: String, trim: true, default: '' }
     },
     isActive: {
       type: Boolean,
