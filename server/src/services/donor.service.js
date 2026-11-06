@@ -208,7 +208,11 @@ export class DonorService {
     };
 
     if (query.bloodGroup) {
-      filter.bloodGroup = query.bloodGroup.toUpperCase();
+      let grp = query.bloodGroup.trim().toUpperCase();
+      if (!grp.endsWith('+') && !grp.endsWith('-')) {
+        grp = grp + '+';
+      }
+      filter.bloodGroup = grp;
     }
 
     if (query.city) {
