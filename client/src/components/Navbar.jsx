@@ -12,7 +12,7 @@ const navItems = [
   { id: 'contact', label: 'Contact', href: '#contact' },
 ];
 
-export default function Navbar({ onOpenAuthModal }) {
+export default function Navbar({ onOpenAuthModal, onOpenBloodPortal }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -120,10 +120,17 @@ export default function Navbar({ onOpenAuthModal }) {
         </nav>
 
         {/* Action Button & Mobile Menu Toggle */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <button
+            onClick={() => onOpenBloodPortal && onOpenBloodPortal('hospital')}
+            className="hidden md:inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#B91C35] px-3.5 py-2 rounded-full border border-slate-200 hover:border-red-200 bg-white hover:bg-red-50/50 transition shadow-2xs cursor-pointer"
+          >
+            <span>Hospital Desk</span>
+          </button>
+
           <button
             onClick={() => onOpenAuthModal('login')}
-            className="hidden sm:inline-flex items-center gap-2 bg-[#B91C35] hover:bg-[#9E152C] text-white text-sm font-semibold px-5 py-2.5 rounded-full transition-all shadow-sm hover:shadow-md hover:shadow-red-900/15 active:scale-95"
+            className="hidden sm:inline-flex items-center gap-2 bg-[#B91C35] hover:bg-[#9E152C] text-white text-sm font-semibold px-5 py-2.5 rounded-full transition-all shadow-sm hover:shadow-md hover:shadow-red-900/15 active:scale-95 cursor-pointer"
           >
             <span>Login / Register</span>
             <ArrowUpRight size={16} />
@@ -166,6 +173,15 @@ export default function Navbar({ onOpenAuthModal }) {
                 </a>
               ))}
               <div className="pt-3 border-t border-slate-100 mt-2 flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    if (onOpenBloodPortal) onOpenBloodPortal('hospital');
+                  }}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold py-2.5 rounded-xl transition text-center shadow-xs"
+                >
+                  Hospital Command Desk
+                </button>
                 <button
                   onClick={() => {
                     setMobileMenuOpen(false);
