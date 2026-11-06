@@ -3,19 +3,50 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
   Flame,
-  Users,
   CheckCheck,
   Eye,
   MapPin,
   AlertCircle,
   Activity,
-  Droplet
+  Droplet,
+  Package,
+  UserCheck,
+  Building2,
+  BarChart3,
+  Inbox
 } from 'lucide-react';
 import { StatusBadge, PriorityBadge } from './StatusBadge';
+import HospitalInventoryView from '../hospital/HospitalInventoryView';
+import HospitalStaffView from '../hospital/HospitalStaffView';
+import HospitalProfileView from '../hospital/HospitalProfileView';
+import HospitalAnalyticsView from '../hospital/HospitalAnalyticsView';
 
 const BLOOD_GROUPS = ['ALL', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const STATUSES = ['ALL', 'PENDING', 'APPROVED', 'MATCHED', 'FULFILLED', 'REJECTED', 'CANCELLED'];
 const PRIORITIES = ['ALL', 'CRITICAL', 'HIGH', 'NORMAL'];
+
+const INITIAL_DEMO_INVENTORY = [
+  { bloodGroup: 'A+', unitsAvailable: 14, unitsReserved: 1, lowStockThreshold: 5, storageLocation: 'Bay 1A' },
+  { bloodGroup: 'A-', unitsAvailable: 6, unitsReserved: 0, lowStockThreshold: 4, storageLocation: 'Bay 1B' },
+  { bloodGroup: 'B+', unitsAvailable: 18, unitsReserved: 2, lowStockThreshold: 5, storageLocation: 'Bay 2A' },
+  { bloodGroup: 'B-', unitsAvailable: 3, unitsReserved: 0, lowStockThreshold: 5, storageLocation: 'Bay 2B', isLowStock: true },
+  { bloodGroup: 'AB+', unitsAvailable: 7, unitsReserved: 0, lowStockThreshold: 4, storageLocation: 'Bay 3A' },
+  { bloodGroup: 'AB-', unitsAvailable: 2, unitsReserved: 0, lowStockThreshold: 3, storageLocation: 'Bay 3B', isLowStock: true },
+  { bloodGroup: 'O+', unitsAvailable: 22, unitsReserved: 3, lowStockThreshold: 8, storageLocation: 'Bay 4A' },
+  { bloodGroup: 'O-', unitsAvailable: 4, unitsReserved: 1, lowStockThreshold: 6, storageLocation: 'Emergency Bay O', isLowStock: true }
+];
+
+const INITIAL_DEMO_BATCHES = [
+  { batchNumber: 'BAT-202611-X48A', bloodGroup: 'O+', units: 10, remainingUnits: 8, componentType: 'WHOLE_BLOOD', collectionDate: '2026-10-28', expiryDate: '2026-12-09', status: 'AVAILABLE', storageLocation: 'Bay 4A' },
+  { batchNumber: 'BAT-202611-B99Q', bloodGroup: 'A+', units: 6, remainingUnits: 6, componentType: 'WHOLE_BLOOD', collectionDate: '2026-11-01', expiryDate: '2026-12-13', status: 'AVAILABLE', storageLocation: 'Bay 1A' },
+  { batchNumber: 'BAT-202611-O12M', bloodGroup: 'O-', units: 4, remainingUnits: 4, componentType: 'WHOLE_BLOOD', collectionDate: '2026-11-04', expiryDate: '2026-12-16', status: 'AVAILABLE', storageLocation: 'Emergency Bay O' }
+];
+
+const INITIAL_DEMO_STAFF = [
+  { _id: 's1', name: 'Dr. Evelyn Reed', email: 'e.reed@hospital.org', phone: '+1 555-8811', role: 'CHIEF_MEDICAL_OFFICER', department: 'Transfusion Medicine', shift: 'MORNING' },
+  { _id: 's2', name: 'Dr. Michael Chen', email: 'm.chen@hospital.org', phone: '+1 555-8812', role: 'HEMATOLOGIST', department: 'Hematology & Oncology', shift: 'EVENING' },
+  { _id: 's3', name: 'Nurse Clara Vance', email: 'c.vance@hospital.org', phone: '+1 555-8813', role: 'NURSE_COORDINATOR', department: 'Blood Bank Donor Intake', shift: 'ROTATING' }
+];
 
 export default function HospitalDashboard({
   requests = [],
@@ -35,9 +66,94 @@ export default function HospitalDashboard({
   onFindDonors,
   onViewDetails
 }) {
+  const [activeSubTab, setActiveSubTab] = useState('REQUESTS'); // 'REQUESTS' | 'INVENTORY' | 'STAFF' | 'PROFILE' | 'ANALYTICS'
   const [rejectingId, setRejectingId] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Hospital Phase 6 Feature States
+  const [inventory, setInventory] = useState(INITIAL_DEMO_INVENTORY);
+  const [batches, setBatches] = useState(INITIAL_DEMO_BATCHES);
+  const [staff, setStaff] = useState(INITIAL_DEMO_STAFF);
+  const [hospitalProfile, setHospitalProfile] = useState({
+    name: 'Metro Trauma Center',
+    city: 'Metropolis',
+    phone: '+1 555-019-4400',
+    hospitalDetails: {
+      facilityName: 'Metro Regional Apex Trauma & Transfusion Hospital',
+      department: 'Department of Transfusion Medicine',
+      hospitalType: 'GOVERNMENT',
+      licenseNumber: 'LIC-METRO-991',
+      bloodBankLicense: 'BB-LIC-2026-X99',
+      totalBeds: 450,
+      emergencyHotline: '+1 (555) 911-0022',
+      address: '100 Medical Plaza Blvd, Ward 4',
+      isVerified: true,
+      verificationStatus: 'VERIFIED'
+    }
+  });
+
+  const handleStockIn = (formData) => {
+    const units = Number(formData.units) || 1;
+    const newBatch = {
+      batchNumber: `BAT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+      bloodGroup: formData.bloodGroup,
+      units,
+      remainingUnits: units,
+      componentType: formData.componentType,
+      collectionDate: formData.collectionDate,
+      expiryDate: formData.expiryDate,
+      status: 'AVAILABLE',
+      storageLocation: formData.storageLocation
+    };
+    setBatches((prev) => [newBatch, ...prev]);
+    setInventory((prev) =>
+      prev.map((i) =>
+        i.bloodGroup === formData.bloodGroup
+          ? { ...i, unitsAvailable: i.unitsAvailable + units, isLowStock: (i.unitsAvailable + units) <= i.lowStockThreshold }
+          : i
+      )
+    );
+  };
+
+  const handleStockOut = (formData) => {
+    const units = Number(formData.units) || 1;
+    setInventory((prev) =>
+      prev.map((i) =>
+        i.bloodGroup === formData.bloodGroup
+          ? {
+              ...i,
+              unitsAvailable: Math.max(0, i.unitsAvailable - units),
+              isLowStock: Math.max(0, i.unitsAvailable - units) <= i.lowStockThreshold
+            }
+          : i
+      )
+    );
+  };
+
+  const handleDiscardExpired = () => {
+    setBatches((prev) =>
+      prev.map((b) => (new Date(b.expiryDate) < new Date() ? { ...b, status: 'DISCARDED', remainingUnits: 0 } : b))
+    );
+  };
+
+  const handleUpdateThreshold = ({ bloodGroup, threshold }) => {
+    setInventory((prev) =>
+      prev.map((i) =>
+        i.bloodGroup === bloodGroup
+          ? { ...i, lowStockThreshold: threshold, isLowStock: i.unitsAvailable <= threshold }
+          : i
+      )
+    );
+  };
+
+  const handleAddStaff = (newStaff) => {
+    setStaff((prev) => [{ ...newStaff, _id: `s_${Date.now()}` }, ...prev]);
+  };
+
+  const handleRemoveStaff = (staffId) => {
+    setStaff((prev) => prev.filter((s) => s._id !== staffId));
+  };
 
   const handleConfirmReject = async () => {
     if (!rejectingId) return;
@@ -51,10 +167,64 @@ export default function HospitalDashboard({
   };
 
   const overview = stats?.overview || {};
+  const totalStockAvailable = inventory.reduce((acc, curr) => acc + (curr.unitsAvailable || 0), 0);
 
   return (
     <div className="space-y-6">
-      {/* Top Analytics Cards */}
+      {/* Hospital Sub-Navigation Bar */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-900/80 rounded-2xl border border-slate-800 text-xs font-bold text-white">
+        <button
+          onClick={() => setActiveSubTab('REQUESTS')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition cursor-pointer ${
+            activeSubTab === 'REQUESTS' ? 'bg-[#B91C35] text-white shadow-xs' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Inbox size={15} />
+          <span>Incoming Requisitions ({requests.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('INVENTORY')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition cursor-pointer ${
+            activeSubTab === 'INVENTORY' ? 'bg-[#B91C35] text-white shadow-xs' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Package size={15} />
+          <span>Blood Inventory ({totalStockAvailable} Units)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('STAFF')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition cursor-pointer ${
+            activeSubTab === 'STAFF' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <UserCheck size={15} />
+          <span>Staff Roster ({staff.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('PROFILE')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition cursor-pointer ${
+            activeSubTab === 'PROFILE' ? 'bg-slate-800 text-white shadow-xs border border-slate-700' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Building2 size={15} />
+          <span>Facility Profile</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('ANALYTICS')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition cursor-pointer ${
+            activeSubTab === 'ANALYTICS' ? 'bg-slate-800 text-white shadow-xs border border-slate-700' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <BarChart3 size={15} />
+          <span>Analytics & Reports</span>
+        </button>
+      </div>
+
+      {/* Top Analytics Cards (Rendered across tabs for quick context) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-red-100 text-red-700 flex items-center justify-center font-bold shrink-0">
@@ -86,14 +256,14 @@ export default function HospitalDashboard({
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
-            <Users className="w-6 h-6 text-purple-600" />
+            <Droplet className="w-6 h-6 text-purple-600 fill-current" />
           </div>
           <div>
             <span className="text-2xl font-black text-slate-900 block leading-none">
-              {overview.matchedRequests ?? requests.filter((r) => r.status === 'MATCHED').length}
+              {totalStockAvailable}
             </span>
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mt-1">
-              Donors Dispatched
+              Units in Inventory
             </span>
           </div>
         </div>
@@ -113,217 +283,254 @@ export default function HospitalDashboard({
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row gap-3">
-          {/* Search box */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search by Request ID, Patient Name, Hospital, or City..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#B91C35]"
-            />
-          </div>
-
-          {/* Blood group select */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">
-              Group:
-            </span>
-            <select
-              value={selectedBloodGroup}
-              onChange={(e) => onBloodGroupChange(e.target.value)}
-              className="px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-[#B91C35] bg-white focus:outline-none focus:ring-2 focus:ring-[#B91C35]"
-            >
-              {BLOOD_GROUPS.map((g) => (
-                <option key={g} value={g}>
-                  {g === 'ALL' ? 'All Blood Types' : g}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Priority select */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">
-              Priority:
-            </span>
-            <select
-              value={selectedPriority}
-              onChange={(e) => onPriorityChange(e.target.value)}
-              className="px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#B91C35]"
-            >
-              {PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {p === 'ALL' ? 'All Priorities' : p}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Status Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pt-1 border-t border-slate-100">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider pr-2">
-            Status:
-          </span>
-          {STATUSES.map((st) => (
-            <button
-              key={st}
-              onClick={() => onStatusChange(st)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
-                selectedStatus === st
-                  ? 'bg-[#B91C35] text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {st}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Requests Table / Cards */}
-      {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3, 4].map((n) => (
-            <div key={n} className="h-20 bg-white rounded-xl border border-slate-200 animate-pulse" />
-          ))}
-        </div>
-      ) : requests.length === 0 ? (
-        <div className="bg-white p-12 text-center rounded-2xl border border-slate-200">
-          <Droplet className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <h4 className="font-bold text-slate-800">No matching blood requests found</h4>
-          <p className="text-xs text-slate-500 mt-1">
-            Try adjusting your search query, priority filter, or blood group selection.
-          </p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
-                <tr>
-                  <th className="py-3.5 px-4">Request / Patient</th>
-                  <th className="py-3.5 px-4">Group</th>
-                  <th className="py-3.5 px-4">Units</th>
-                  <th className="py-3.5 px-4">Hospital & Location</th>
-                  <th className="py-3.5 px-4">Priority</th>
-                  <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4 text-right">Clinical Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {requests.map((req) => {
-                  const reqId = req._id || req.requestId;
-                  const isPending = req.status === 'PENDING';
-                  const isApproved = req.status === 'APPROVED';
-                  const isMatched = req.status === 'MATCHED';
-
-                  return (
-                    <tr key={reqId} className="hover:bg-slate-50/70 transition">
-                      {/* Patient & ID */}
-                      <td className="py-4 px-4 font-medium">
-                        <div className="font-bold text-slate-900 text-sm">{req.patientName}</div>
-                        <div className="font-mono text-[11px] text-slate-400">#{req.requestId}</div>
-                      </td>
-
-                      {/* Blood Group */}
-                      <td className="py-4 px-4">
-                        <span className="w-9 h-9 rounded-lg bg-red-50 text-[#B91C35] font-black text-xs flex items-center justify-center border border-red-200/70">
-                          {req.bloodGroup}
-                        </span>
-                      </td>
-
-                      {/* Units Required vs Fulfilled */}
-                      <td className="py-4 px-4">
-                        <span className="font-bold text-slate-800 text-sm">
-                          {req.unitsFulfilled || 0} / {req.unitsRequired}
-                        </span>
-                        <span className="text-[10px] text-slate-400 block">Units</span>
-                      </td>
-
-                      {/* Hospital & City */}
-                      <td className="py-4 px-4">
-                        <div className="font-semibold text-slate-800">{req.hospital}</div>
-                        <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                          <MapPin size={11} /> {req.city}
-                        </div>
-                      </td>
-
-                      {/* Priority */}
-                      <td className="py-4 px-4">
-                        <PriorityBadge priority={req.priority} />
-                      </td>
-
-                      {/* Status */}
-                      <td className="py-4 px-4">
-                        <StatusBadge status={req.status} />
-                      </td>
-
-                      {/* Clinical Actions */}
-                      <td className="py-4 px-4 text-right space-x-1.5 whitespace-nowrap">
-                        {isPending && (
-                          <>
-                            <button
-                              onClick={() => onApproveRequest(reqId)}
-                              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition shadow-2xs"
-                              title="Approve Requisition"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => setRejectingId(reqId)}
-                              className="px-2.5 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-[11px] transition"
-                              title="Reject Requisition"
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-
-                        {(isApproved || isMatched) && (
-                          <>
-                            <button
-                              onClick={() => onFindDonors(req)}
-                              className="px-2.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] transition shadow-2xs inline-flex items-center gap-1"
-                              title="Find Compatible Donors"
-                            >
-                              <Users size={12} />
-                              Find Donors
-                            </button>
-                            <button
-                              onClick={() => onFulfillRequest(reqId)}
-                              className="px-2.5 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-[11px] transition"
-                              title="Record Clinical Fulfillment"
-                            >
-                              Fulfilled
-                            </button>
-                          </>
-                        )}
-
-                        <button
-                          onClick={() => onViewDetails(req)}
-                          className="px-2 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-[11px] transition"
-                          title="View Requisition File"
-                        >
-                          <Eye size={13} className="inline mr-1" />
-                          File
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {/* SUB-VIEW 1: INVENTORY */}
+      {activeSubTab === 'INVENTORY' && (
+        <HospitalInventoryView
+          inventory={inventory}
+          batches={batches}
+          onStockIn={handleStockIn}
+          onStockOut={handleStockOut}
+          onDiscardExpired={handleDiscardExpired}
+          onUpdateThreshold={handleUpdateThreshold}
+        />
       )}
 
-      {/* Inline Reject Modal */}
+      {/* SUB-VIEW 2: STAFF */}
+      {activeSubTab === 'STAFF' && (
+        <HospitalStaffView
+          staff={staff}
+          onAddStaff={handleAddStaff}
+          onRemoveStaff={handleRemoveStaff}
+        />
+      )}
+
+      {/* SUB-VIEW 3: PROFILE */}
+      {activeSubTab === 'PROFILE' && (
+        <HospitalProfileView
+          hospital={hospitalProfile}
+          onUpdateProfile={(data) => {
+            setHospitalProfile((prev) => ({
+              ...prev,
+              name: data.name,
+              city: data.city,
+              phone: data.phone,
+              hospitalDetails: {
+                ...prev.hospitalDetails,
+                ...data
+              }
+            }));
+          }}
+        />
+      )}
+
+      {/* SUB-VIEW 4: ANALYTICS */}
+      {activeSubTab === 'ANALYTICS' && (
+        <HospitalAnalyticsView
+          stats={stats}
+        />
+      )}
+
+      {/* SUB-VIEW 5: INCOMING REQUESTS (Existing Triage Management) */}
+      {activeSubTab === 'REQUESTS' && (
+        <>
+          {/* Filter and Search Bar */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex flex-col md:flex-row gap-3">
+              {/* Search box */}
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  placeholder="Search by Request ID, Patient Name, Hospital, or City..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#B91C35]"
+                />
+              </div>
+
+              {/* Blood group select */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">
+                  Group:
+                </span>
+                <select
+                  value={selectedBloodGroup}
+                  onChange={(e) => onBloodGroupChange(e.target.value)}
+                  className="px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-[#B91C35] bg-white focus:outline-none focus:ring-2 focus:ring-[#B91C35]"
+                >
+                  {BLOOD_GROUPS.map((g) => (
+                    <option key={g} value={g}>
+                      {g === 'ALL' ? 'All Blood Types' : g}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Priority select */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">
+                  Priority:
+                </span>
+                <select
+                  value={selectedPriority}
+                  onChange={(e) => onPriorityChange(e.target.value)}
+                  className="px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#B91C35]"
+                >
+                  {PRIORITIES.map((p) => (
+                    <option key={p} value={p}>
+                      {p === 'ALL' ? 'All Priorities' : p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Status select */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">
+                  Status:
+                </span>
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => onStatusChange(e.target.value)}
+                  className="px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#B91C35]"
+                >
+                  {STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s === 'ALL' ? 'All Statuses' : s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Requests Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
+                  <tr>
+                    <th className="p-4">Requisition</th>
+                    <th className="p-4">Patient & Hospital</th>
+                    <th className="p-4">Blood Group</th>
+                    <th className="p-4">Units Needed</th>
+                    <th className="p-4">Priority</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-slate-400">
+                        Loading requests...
+                      </td>
+                    </tr>
+                  ) : requests.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-slate-400">
+                        No blood requests matching the selected filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    requests.map((r) => {
+                      const isPending = r.status === 'PENDING';
+                      const isApproved = r.status === 'APPROVED';
+                      const isMatched = r.status === 'MATCHED';
+                      const isFulfilled = r.status === 'FULFILLED';
+                      const isTerminal = ['FULFILLED', 'REJECTED', 'CANCELLED'].includes(r.status);
+
+                      return (
+                        <tr key={r._id || r.requestId} className="hover:bg-slate-50/70 transition">
+                          <td className="p-4 font-mono font-bold text-slate-900 text-xs">
+                            {r.requestId || 'BLR-N/A'}
+                          </td>
+                          <td className="p-4">
+                            <div className="font-bold text-slate-900">{r.patientName}</div>
+                            <div className="text-xs text-slate-500 flex items-center gap-1">
+                              <MapPin size={11} /> {r.hospital} ({r.city})
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <span className="font-black text-base text-[#B91C35] bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg">
+                              {r.bloodGroup}
+                            </span>
+                          </td>
+                          <td className="p-4 font-bold text-slate-700">
+                            {r.unitsRequired} {r.unitsRequired > 1 ? 'Units' : 'Unit'}
+                            {r.unitsFulfilled > 0 && (
+                              <span className="text-xs text-emerald-600 block">
+                                ({r.unitsFulfilled} fulfilled)
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-4">
+                            <PriorityBadge priority={r.priority} />
+                          </td>
+                          <td className="p-4">
+                            <StatusBadge status={r.status} />
+                          </td>
+                          <td className="p-4 text-right space-x-1.5 whitespace-nowrap">
+                            <button
+                              onClick={() => onViewDetails(r)}
+                              title="View Requisition Details"
+                              className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition"
+                            >
+                              <Eye size={16} />
+                            </button>
+
+                            {isPending && (
+                              <>
+                                <button
+                                  onClick={() => onApproveRequest(r._id || r.requestId)}
+                                  className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition shadow-xs"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() => setRejectingId(r._id || r.requestId)}
+                                  className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold border border-rose-200 transition"
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            )}
+
+                            {(isApproved || isMatched) && (
+                              <>
+                                <button
+                                  onClick={() => onFindDonors(r)}
+                                  className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition shadow-xs"
+                                >
+                                  Find Donors
+                                </button>
+                                <button
+                                  onClick={() => onFulfillRequest(r._id || r.requestId)}
+                                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
+                                >
+                                  Fulfill
+                                </button>
+                              </>
+                            )}
+
+                            {isTerminal && (
+                              <span className="text-xs text-slate-400 font-medium italic">
+                                {isFulfilled ? 'Completed' : 'Closed'}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Reject Modal Dialog */}
       <AnimatePresence>
         {rejectingId && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">

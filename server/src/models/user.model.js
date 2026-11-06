@@ -58,7 +58,28 @@ const userSchema = new mongoose.Schema(
     hospitalDetails: {
       licenseNumber: { type: String, trim: true, default: '' },
       facilityName: { type: String, trim: true, default: '' },
-      department: { type: String, trim: true, default: '' }
+      department: { type: String, trim: true, default: '' },
+      hospitalType: {
+        type: String,
+        enum: ['GOVERNMENT', 'PRIVATE', 'TRUST', 'MILITARY', 'CLINIC', ''],
+        default: 'PRIVATE'
+      },
+      registrationNumber: { type: String, trim: true, default: '' },
+      address: { type: String, trim: true, default: '' },
+      state: { type: String, trim: true, default: '' },
+      postalCode: { type: String, trim: true, default: '' },
+      emergencyHotline: { type: String, trim: true, default: '' },
+      totalBeds: { type: Number, min: 0, default: 0 },
+      bloodBankLicense: { type: String, trim: true, default: '' },
+      isVerified: { type: Boolean, default: false },
+      verificationStatus: {
+        type: String,
+        enum: ['PENDING', 'VERIFIED', 'REJECTED'],
+        default: 'PENDING'
+      },
+      verifiedAt: { type: Date, default: null },
+      verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      verificationNotes: { type: String, trim: true, default: '' }
     },
     donorDetails: {
       lastDonationDate: { type: Date, default: null },
