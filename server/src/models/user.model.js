@@ -84,6 +84,13 @@ const userSchema = new mongoose.Schema(
     donorDetails: {
       lastDonationDate: { type: Date, default: null },
       isAvailable: { type: Boolean, default: true },
+      availabilityStatus: {
+        type: String,
+        enum: ['AVAILABLE', 'UNAVAILABLE', 'PAUSED'],
+        default: 'AVAILABLE'
+      },
+      availabilityUpdatedAt: { type: Date, default: Date.now },
+      availabilityNotes: { type: String, trim: true, default: '' },
       eligibilityStatus: {
         type: String,
         enum: [
@@ -94,6 +101,8 @@ const userSchema = new mongoose.Schema(
         ],
         default: 'PENDING_SCREENING'
       },
+      dateOfBirth: { type: Date, default: null },
+      avatar: { type: String, trim: true, default: '' },
       age: { type: Number, min: 16, max: 100, default: null },
       weight: { type: Number, min: 30, max: 250, default: null },
       gender: {
@@ -105,8 +114,10 @@ const userSchema = new mongoose.Schema(
       state: { type: String, trim: true, default: '' },
       postalCode: { type: String, trim: true, default: '' },
       emergencyContact: { type: String, trim: true, default: '' },
+      emergencyContactName: { type: String, trim: true, default: '' },
       totalDonations: { type: Number, min: 0, default: 0 },
-      medicalNotes: { type: String, trim: true, default: '' }
+      medicalNotes: { type: String, trim: true, default: '' },
+      profileCompletion: { type: Number, min: 0, max: 100, default: 0 }
     },
     isActive: {
       type: Boolean,

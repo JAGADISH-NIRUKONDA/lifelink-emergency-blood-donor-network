@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HeartPulse, Menu, X, ArrowUpRight, ShieldCheck, Mail } from 'lucide-react';
+import { HeartPulse, Heart, Menu, X, ArrowUpRight, ShieldCheck, Mail } from 'lucide-react';
 import NotificationBell from './notifications/NotificationBell';
 
 const navItems = [
@@ -13,7 +13,13 @@ const navItems = [
   { id: 'contact', label: 'Contact', href: '#contact' },
 ];
 
-export default function Navbar({ onOpenAuthModal, onOpenBloodPortal, onOpenNotificationCenter, onOpenAdminPortal }) {
+export default function Navbar({
+  onOpenAuthModal,
+  onOpenBloodPortal,
+  onOpenNotificationCenter,
+  onOpenAdminPortal,
+  onOpenDonorPortal
+}) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -128,6 +134,14 @@ export default function Navbar({ onOpenAuthModal, onOpenBloodPortal, onOpenNotif
           />
 
           <button
+            onClick={() => onOpenDonorPortal && onOpenDonorPortal()}
+            className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#B91C35] px-3.5 py-2 rounded-full border border-slate-200 hover:border-red-200 bg-white hover:bg-red-50/50 transition shadow-2xs cursor-pointer"
+          >
+            <Heart size={13} className="text-[#B91C35] fill-current" />
+            <span>Donor Hub</span>
+          </button>
+
+          <button
             onClick={() => onOpenBloodPortal && onOpenBloodPortal('hospital')}
             className="hidden md:inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#B91C35] px-3.5 py-2 rounded-full border border-slate-200 hover:border-red-200 bg-white hover:bg-red-50/50 transition shadow-2xs cursor-pointer"
           >
@@ -187,6 +201,16 @@ export default function Navbar({ onOpenAuthModal, onOpenBloodPortal, onOpenNotif
                 </a>
               ))}
               <div className="pt-3 border-t border-slate-100 mt-2 flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    if (onOpenDonorPortal) onOpenDonorPortal();
+                  }}
+                  className="w-full bg-[#B91C35] hover:bg-red-700 text-white text-sm font-semibold py-2.5 rounded-xl transition text-center shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Heart size={16} className="fill-current" />
+                  <span>Donor Dashboard Hub</span>
+                </button>
                 <button
                   onClick={() => {
                     setMobileMenuOpen(false);
