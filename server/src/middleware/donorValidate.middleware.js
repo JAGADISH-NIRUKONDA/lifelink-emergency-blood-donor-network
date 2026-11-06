@@ -1,5 +1,5 @@
 import { ApiError } from '../utils/apiError.js';
-import { BLOOD_GROUPS } from '../utils/constants.js';
+import { BLOOD_GROUPS, DONOR_AVAILABILITY_STATUS_LIST } from '../utils/constants.js';
 
 /**
  * Validate donor profile update payload
@@ -13,7 +13,9 @@ export const validateDonorProfileUpdate = (req, res, next) => {
     address,
     postalCode,
     isAvailable,
+    availabilityStatus,
     lastDonationDate,
+    dateOfBirth,
     age,
     weight,
     gender,
@@ -33,7 +35,22 @@ export const validateDonorProfileUpdate = (req, res, next) => {
     }
   }
 
-  // Last Donation Date Validation (cannot be in the future)
+  // Date of Birth / Last Donation Date Validation (cannot be in the future)
+  if (dateOfBirth !== undefined && dateOfBirth !== null && dateOfBirth !== '') {
+    const parsedDob = new Date(dateOfBirth);
+    if (isNaN(parsedDob.getTime())) {
+      errors.push({
+        field: 'dateOfBirth',
+        message: 'Invalid dateOfBirth format. Please provide a valid ISO date string.'
+      });
+    } else if (parsedDob > new Date()) {
+      errors.push({
+        field: 'dateOfBirth',
+        message: 'Date of birth cannot be in the future.'
+      });
+    }
+  }
+
   if (lastDonationDate !== undefined && lastDonationDate !== null && lastDonationDate !== '') {
     const parsedDate = new Date(lastDonationDate);
     if (isNaN(parsedDate.getTime())) {
@@ -79,6 +96,13 @@ export const validateDonorProfileUpdate = (req, res, next) => {
     });
   }
 
+  if (availabilityStatus !== undefined && !DONOR_AVAILABILITY_STATUS_LIST.includes(availabilityStatus)) {
+    errors.push({
+      field: 'availabilityStatus',
+      message: `Invalid availabilityStatus. Allowed: ${DONOR_AVAILABILITY_STATUS_LIST.join(', ')}`
+    });
+  }
+
   // Gender Validation
   const validGenders = ['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY', ''];
   if (gender !== undefined && !validGenders.includes(gender)) {
@@ -110,16 +134,76 @@ export const validateDonorProfileUpdate = (req, res, next) => {
  * Validate availability toggle payload
  */
 export const validateAvailability = (req, res, next) => {
-  const { isAvailable } = req.body;
+  const { isAvailable, availabilityStatus } = req.body;
 
-  if (typeof isAvailable !== 'boolean') {
+  const hasBool = typeof isAvailable === 'boolean';
+  const hasStatus = typeof availabilityStatus === 'string' && DONOR_AVAILABILITY_STATUS_LIST.includes(availabilityStatus);
+
+  if (!hasBool && !hasStatus) {
     return next(
-      new ApiError(400, 'Validation failed: isAvailable field is required and must be a boolean (true or false).', [
-        { field: 'isAvailable', message: 'isAvailable must be a boolean' }
-      ])
+      new ApiError(
+        400,
+        `Validation failed: provide either a boolean isAvailable or valid availabilityStatus (${DONOR_AVAILABILITY_STATUS_LIST.join(', ')}).`,
+        [{ field: 'isAvailable', message: 'isAvailable or availabilityStatus is required' }]
+      )
     );
   }
 
   next();
 };
 
+/**
+ * Validate recording a verified donation
+ */
+export const validateDonationRecord = (req, res, next) => {
+  const { hospitalName, bloodGroup, units, donationDate } = req.body;
+  const errors = [];
+
+  if (!hospitalName || typeof hospitalName !== 'string' || !hospitalName.trim()) {
+    errors.push({ field: 'hospitalName', message: 'Hospital name is required.' });
+  }
+
+  if (!bloodGroup || !BLOOD_GROUPS.includes(bloodGroup)) {
+    errors.push({ field: 'bloodGroup', message: `Valid bloodGroup is required (${BLOOD_GROUPS.join(', ')}).` });
+  }
+
+  if (units !== undefined) {
+    const numUnits = Number(units);
+    if (isNaN(numUnits) || numUnits < 1 || numUnits > 10) {
+      errors.push({ field: 'units', message: 'Units must be between 1 and 10.' });
+    }
+  }
+
+  if (donationDate) {
+    const parsed = new Date(donationDate);
+    if (isNaN(parsed.getTime())) {
+      errors.push({ field: 'donationDate', message: 'Invalid donation date.' });
+    } else if (parsed > new Date()) {
+      errors.push({ field: 'donationDate', message: 'Donation date cannot be in the future.' });
+    }
+  }
+
+  if (errors.length > 0) {
+    return next(new ApiError(400, 'Validation failed for donation record', errors));
+  }
+
+  next();
+};
+
+/**
+ * Validate donor response to blood request
+ */
+export const validateRequestResponse = (req, res, next) => {
+  const { response } = req.body;
+  const validResponses = ['ACCEPTED', 'REJECTED', 'INTERESTED'];
+
+  if (!response || !validResponses.includes(response)) {
+    return next(
+      new ApiError(400, `Validation failed: response must be one of: ${validResponses.join(', ')}`, [
+        { field: 'response', message: `Invalid response status. Allowed: ${validResponses.join(', ')}` }
+      ])
+    );
+  }
+
+  next();
+};

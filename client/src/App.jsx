@@ -14,6 +14,7 @@ import ActionModal from './components/ActionModal';
 import BloodRequestPortal from './components/bloodRequests/BloodRequestPortal';
 import NotificationCenterModal from './components/notifications/NotificationCenterModal';
 import AdminPortal from './components/admin/AdminPortal';
+import DonorPortal from './components/donor/DonorPortal';
 
 const INITIAL_APP_NOTIFICATIONS = [
   {
@@ -63,6 +64,7 @@ function App() {
 
   const [notificationCenterOpen, setNotificationCenterOpen] = useState(false);
   const [adminPortalOpen, setAdminPortalOpen] = useState(false);
+  const [donorPortalOpen, setDonorPortalOpen] = useState(false);
   const [notifications, setNotifications] = useState(INITIAL_APP_NOTIFICATIONS);
 
   const openModal = (mode = 'request', defaultBloodGroup = '') => {
@@ -105,6 +107,7 @@ function App() {
         onOpenBloodPortal={(tab) => openBloodPortal(tab || 'hospital')}
         onOpenNotificationCenter={() => setNotificationCenterOpen(true)}
         onOpenAdminPortal={() => setAdminPortalOpen(true)}
+        onOpenDonorPortal={() => setDonorPortalOpen(true)}
       />
 
       <main>
@@ -197,6 +200,12 @@ function App() {
       <AdminPortal
         isOpen={adminPortalOpen}
         onClose={() => setAdminPortalOpen(false)}
+      />
+
+      {/* Phase 9: Donor Dashboard & Donor Management Portal */}
+      <DonorPortal
+        isOpen={donorPortalOpen}
+        onClose={() => setDonorPortalOpen(false)}
       />
     </div>
   );

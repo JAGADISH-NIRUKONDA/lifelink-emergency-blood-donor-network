@@ -87,6 +87,36 @@ export function getBloodCompatibility(bloodGroup) {
  * Evaluates clinical whole blood donation eligibility
  * Checks 56-day rest period, age (18-65), weight (>=50kg), and availability
  */
+export const CLINICAL_ELIGIBILITY_DISCLAIMER =
+  'Never independently declare a donor medically eligible or recommend donation based only on software calculations. The assessment information presented is strictly educational. Donors must be screened in person by qualified medical professionals and transfusion laboratory staff prior to donation.';
+
+/**
+ * Calculates profile completion percentage based on 10 essential fields
+ */
+export function calculateProfileCompletion(user) {
+  if (!user) return 0;
+  const d = user.donorDetails || {};
+  const criteria = [
+    Boolean(user.name && user.name.trim().length >= 2),
+    Boolean(user.email && user.email.includes('@')),
+    Boolean(user.phone && user.phone.trim().length >= 7),
+    Boolean(user.bloodGroup),
+    Boolean(user.city && user.city.trim().length >= 2),
+    Boolean(d.dateOfBirth || d.age),
+    Boolean(d.gender),
+    Boolean(d.address && d.address.trim().length >= 3),
+    Boolean(d.emergencyContact && d.emergencyContact.trim().length >= 5),
+    Boolean(d.weight && d.weight >= 30)
+  ];
+
+  const metCount = criteria.filter(Boolean).length;
+  return Math.round((metCount / criteria.length) * 100);
+}
+
+/**
+ * Evaluates clinical whole blood donation eligibility
+ * Checks 56-day rest period, age (18-65), weight (>=50kg), and availability
+ */
 export function calculateDonationEligibility(donor) {
   const donorDetails = donor?.donorDetails || {};
   const lastDonationDate = donorDetails.lastDonationDate
@@ -165,6 +195,7 @@ export function calculateDonationEligibility(donor) {
     summary: isEligible
       ? 'Currently eligible for voluntary blood donation screening.'
       : reasons.join(' '),
+    clinicalAdvisoryNotice: CLINICAL_ELIGIBILITY_DISCLAIMER,
     guidelines: {
       minIntervalDays: MIN_DONATION_INTERVAL_DAYS,
       minAge: MIN_DONOR_AGE,

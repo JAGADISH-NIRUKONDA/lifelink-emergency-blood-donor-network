@@ -24,7 +24,7 @@ export const getMyProfile = async (req, res, next) => {
  */
 export const updateMyProfile = async (req, res, next) => {
   try {
-    const data = await DonorService.updateDonorProfile(req.user._id, req.body);
+    const data = await DonorService.updateDonorProfile(req.user._id, req.body, req.user);
     return res
       .status(200)
       .json(new ApiResponse(200, data, 'Donor profile updated successfully.'));
@@ -34,22 +34,19 @@ export const updateMyProfile = async (req, res, next) => {
 };
 
 /**
- * Controller: Quick toggle donor availability
+ * Controller: Quick toggle / pause donor availability
  * PATCH /api/v1/donors/availability
  */
 export const updateMyAvailability = async (req, res, next) => {
   try {
-    const data = await DonorService.updateAvailability(
-      req.user._id,
-      req.body.isAvailable
-    );
+    const data = await DonorService.updateAvailability(req.user._id, req.body, req.user);
     return res
       .status(200)
       .json(
         new ApiResponse(
           200,
           data,
-          `Donor availability status updated to ${data.isAvailable ? 'AVAILABLE' : 'UNAVAILABLE'}.`
+          `Donor availability status updated to ${data.availabilityStatus}.`
         )
       );
   } catch (error) {
@@ -66,7 +63,102 @@ export const getMyDashboard = async (req, res, next) => {
     const data = await DonorService.getDonorDashboard(req.user._id);
     return res
       .status(200)
-      .json(new ApiResponse(200, data, 'Donor dashboard data loaded successfully.'));
+      .json(new ApiResponse(200, data, 'Donor dashboard loaded successfully.'));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Controller: Discover relevant nearby blood requests
+ * GET /api/v1/donors/requests/nearby
+ */
+export const getNearbyRequests = async (req, res, next) => {
+  try {
+    const data = await DonorService.getNearbyRequests(req.user._id, req.query);
+    return res
+      .status(200)
+      .json(new ApiResponse(200, data, 'Nearby blood requests retrieved successfully.'));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Controller: Respond to an active blood request
+ * POST /api/v1/donors/requests/:requestId/respond
+ */
+export const respondToBloodRequest = async (req, res, next) => {
+  try {
+    const data = await DonorService.respondToBloodRequest(
+      req.user._id,
+      req.params.requestId,
+      req.body,
+      req.user
+    );
+    return res
+      .status(200)
+      .json(new ApiResponse(200, data, data.message));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Controller: Get verified donation records
+ * GET /api/v1/donors/donation-history
+ */
+export const getDonationHistory = async (req, res, next) => {
+  try {
+    const data = await DonorService.getDonationHistory(req.user._id, req.query);
+    return res
+      .status(200)
+      .json(new ApiResponse(200, data, 'Donation history retrieved successfully.'));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Controller: Record a verified donation
+ * POST /api/v1/donors/donation-history
+ */
+export const recordDonation = async (req, res, next) => {
+  try {
+    const data = await DonorService.recordDonation(req.user._id, req.body, req.user);
+    return res
+      .status(201)
+      .json(new ApiResponse(201, data, 'Donation record logged successfully.'));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Controller: Get personal donor analytics
+ * GET /api/v1/donors/analytics
+ */
+export const getDonorAnalytics = async (req, res, next) => {
+  try {
+    const data = await DonorService.getDonorAnalytics(req.user._id);
+    return res
+      .status(200)
+      .json(new ApiResponse(200, data, 'Donor analytics loaded successfully.'));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Controller: Get donation eligibility information & reminder
+ * GET /api/v1/donors/eligibility
+ */
+export const getEligibilityInfo = async (req, res, next) => {
+  try {
+    const data = await DonorService.getEligibilityInfo(req.user._id);
+    return res
+      .status(200)
+      .json(new ApiResponse(200, data, 'Eligibility information retrieved successfully.'));
   } catch (error) {
     next(error);
   }
@@ -99,13 +191,10 @@ export const getDonorById = async (req, res, next) => {
     const isAuthorizedRole = [ROLES.ADMIN, ROLES.HOSPITAL].includes(req.user.role);
 
     if (!isSelf && !isAuthorizedRole) {
-      throw new ApiError(
-        403,
-        'Access denied: You do not have permission to view this donor record.'
-      );
+      throw new ApiError(403, 'Access denied. You may only inspect your own donor profile.');
     }
 
-    const data = await DonorService.getDonorById(req.params.id);
+    const data = await DonorService.getDonorProfile(req.params.id);
     return res
       .status(200)
       .json(new ApiResponse(200, data, 'Donor details retrieved successfully.'));
@@ -125,13 +214,10 @@ export const updateDonorById = async (req, res, next) => {
     const isAdmin = req.user.role === ROLES.ADMIN;
 
     if (!isSelf && !isAdmin) {
-      throw new ApiError(
-        403,
-        'Access denied: Only the account owner or an administrator can update this donor record.'
-      );
+      throw new ApiError(403, 'Access denied. You may only edit your own donor profile.');
     }
 
-    const data = await DonorService.updateDonorProfile(req.params.id, req.body);
+    const data = await DonorService.updateDonorProfile(req.params.id, req.body, req.user);
     return res
       .status(200)
       .json(new ApiResponse(200, data, 'Donor record updated successfully.'));
@@ -141,18 +227,17 @@ export const updateDonorById = async (req, res, next) => {
 };
 
 /**
- * Controller: Deactivate donor by ID
+ * Controller: Delete donor account by ID
  * DELETE /api/v1/donors/:id
- * Access: ADMIN
+ * Access: ADMIN only
  */
 export const deleteDonorById = async (req, res, next) => {
   try {
     const data = await DonorService.deleteDonor(req.params.id);
     return res
       .status(200)
-      .json(new ApiResponse(200, data, 'Donor account deleted/deactivated successfully.'));
+      .json(new ApiResponse(200, data, data.message));
   } catch (error) {
     next(error);
   }
 };
-
