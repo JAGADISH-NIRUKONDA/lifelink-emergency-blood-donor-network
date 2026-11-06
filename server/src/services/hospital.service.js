@@ -4,6 +4,7 @@ import { BloodInventory } from '../models/bloodInventory.model.js';
 import { BloodStock } from '../models/bloodStock.model.js';
 import { BloodTransaction } from '../models/bloodTransaction.model.js';
 import { HospitalStaff } from '../models/hospitalStaff.model.js';
+import { AuditLog } from '../models/auditLog.model.js';
 import { ApiError } from '../utils/apiError.js';
 import {
   ROLES,
@@ -11,9 +12,13 @@ import {
   STOCK_TRANSACTION_TYPES,
   STOCK_BATCH_STATUS,
   HOSPITAL_VERIFICATION_STATUS,
-  NOTIFICATION_TYPES
+  NOTIFICATION_TYPES,
+  REQUEST_STATUS,
+  VALID_STATUS_TRANSITIONS,
+  AUDIT_ACTIONS
 } from '../utils/constants.js';
 import { notificationService } from './notification.service.js';
+import { matchingService } from './matching.service.js';
 
 class HospitalService {
   /**
@@ -34,6 +39,26 @@ class HospitalService {
       }));
       await BloodInventory.insertMany(docs);
     }
+  }
+
+  /**
+   * Enforce verification status check: only verified hospitals can access operational mutations
+   */
+  async verifyOperationalAccess(hospitalId) {
+    const hospital = await User.findById(hospitalId);
+    if (!hospital) {
+      throw new ApiError(404, 'Hospital account not found.');
+    }
+    const isVerified =
+      hospital.hospitalDetails?.isVerified === true &&
+      hospital.hospitalDetails?.verificationStatus === HOSPITAL_VERIFICATION_STATUS.VERIFIED;
+    if (!isVerified) {
+      throw new ApiError(
+        403,
+        `Access Denied: Operational features are restricted to verified healthcare facilities. Your facility accreditation status is currently '${hospital.hospitalDetails?.verificationStatus || 'PENDING'}'. Please contact platform administration.`
+      );
+    }
+    return hospital;
   }
 
   /**
@@ -91,6 +116,18 @@ class HospitalService {
     };
 
     await hospital.save();
+
+    await AuditLog.record({
+      actor: hospital,
+      action: AUDIT_ACTIONS.HOSPITAL_PROFILE_UPDATE,
+      targetResource: 'Hospital',
+      targetId: hospital._id,
+      targetIdentifier: hospital.hospitalDetails?.facilityName || hospital.name,
+      details: {
+        fieldsUpdated: Object.keys(updateData)
+      }
+    });
+
     return hospital.toJSON();
   }
 
@@ -115,6 +152,18 @@ class HospitalService {
     hospital.hospitalDetails.verificationNotes = verificationNotes.trim();
 
     await hospital.save();
+
+    await AuditLog.record({
+      actor: adminUser,
+      action: isVerified ? AUDIT_ACTIONS.HOSPITAL_VERIFIED : AUDIT_ACTIONS.HOSPITAL_REJECTED,
+      targetResource: 'Hospital',
+      targetId: hospital._id,
+      targetIdentifier: hospital.hospitalDetails?.facilityName || hospital.name,
+      details: {
+        verificationStatus,
+        verificationNotes
+      }
+    });
 
     // Send real-time notification to the hospital
     await notificationService.createNotification({
@@ -325,6 +374,8 @@ class HospitalService {
    * Update low stock threshold for a blood group
    */
   async updateInventoryThreshold(hospitalId, { bloodGroup, threshold, storageLocation }) {
+    await this.verifyOperationalAccess(hospitalId);
+
     if (!BLOOD_GROUPS.includes(bloodGroup)) {
       throw new ApiError(400, 'Invalid blood group.');
     }
@@ -348,6 +399,8 @@ class HospitalService {
    * Record Stock-In: creates batch, updates aggregate inventory, logs transaction
    */
   async stockIn(hospitalId, user, stockData = {}) {
+    await this.verifyOperationalAccess(hospitalId);
+
     const {
       bloodGroup,
       units,
@@ -423,6 +476,20 @@ class HospitalService {
       notes: notes || ''
     });
 
+    await AuditLog.record({
+      actor: user,
+      action: AUDIT_ACTIONS.STOCK_IN,
+      targetResource: 'BloodStock',
+      targetId: batch._id,
+      targetIdentifier: batch.batchNumber,
+      details: {
+        bloodGroup,
+        units: parsedUnits,
+        componentType: batch.componentType,
+        batchNumber: batch.batchNumber
+      }
+    });
+
     return {
       batch,
       inventory,
@@ -434,6 +501,8 @@ class HospitalService {
    * Record Stock-Out / Transfusion: deducts from available batches (FIFO), decrements inventory, logs transaction
    */
   async stockOut(hospitalId, user, stockOutData = {}) {
+    await this.verifyOperationalAccess(hospitalId);
+
     const {
       bloodGroup,
       units,
@@ -525,6 +594,21 @@ class HospitalService {
       });
     }
 
+    await AuditLog.record({
+      actor: user,
+      action: AUDIT_ACTIONS.STOCK_OUT,
+      targetResource: 'BloodTransaction',
+      targetId: transaction._id,
+      targetIdentifier: transaction.batchNumber,
+      details: {
+        bloodGroup,
+        units: parsedUnits,
+        transactionType,
+        reason,
+        patientName
+      }
+    });
+
     return {
       success: true,
       deductedUnits: parsedUnits,
@@ -538,6 +622,8 @@ class HospitalService {
    * Discard expired batches and adjust aggregate inventory
    */
   async discardExpired(hospitalId, user, { batchId = null, notes = '' } = {}) {
+    await this.verifyOperationalAccess(hospitalId);
+
     const filter = {
       hospital: hospitalId,
       status: { $in: [STOCK_BATCH_STATUS.AVAILABLE, STOCK_BATCH_STATUS.EXPIRED] },
@@ -586,6 +672,19 @@ class HospitalService {
       batch.status = STOCK_BATCH_STATUS.DISCARDED;
       await batch.save();
     }
+
+    await AuditLog.record({
+      actor: user,
+      action: AUDIT_ACTIONS.DISCARD_EXPIRED,
+      targetResource: 'BloodStock',
+      targetId: batchId || null,
+      targetIdentifier: expiredBatches.map((b) => b.batchNumber).join(', '),
+      details: {
+        discardedCount: expiredBatches.length,
+        totalUnitsDiscarded,
+        notes
+      }
+    });
 
     return {
       discardedCount: expiredBatches.length,
@@ -652,6 +751,8 @@ class HospitalService {
   }
 
   async addStaffMember(hospitalId, staffData = {}) {
+    await this.verifyOperationalAccess(hospitalId);
+
     const { name, email, phone, role, department, shift } = staffData;
 
     if (!name || !email) {
@@ -682,6 +783,8 @@ class HospitalService {
   }
 
   async updateStaffMember(hospitalId, staffId, staffData = {}) {
+    await this.verifyOperationalAccess(hospitalId);
+
     const staff = await HospitalStaff.findOne({ _id: staffId, hospital: hospitalId });
     if (!staff) {
       throw new ApiError(404, 'Staff member not found.');
@@ -699,6 +802,8 @@ class HospitalService {
   }
 
   async removeStaffMember(hospitalId, staffId) {
+    await this.verifyOperationalAccess(hospitalId);
+
     const staff = await HospitalStaff.findOne({ _id: staffId, hospital: hospitalId });
     if (!staff) {
       throw new ApiError(404, 'Staff member not found.');
@@ -748,13 +853,298 @@ class HospitalService {
   }
 
   /**
-   * Hospital Analytics & Reports
+   * Hospital-Scoped Incoming Blood Requests (Module 3)
+   */
+  async getHospitalRequests(hospitalId, query = {}) {
+    const hospital = await User.findById(hospitalId);
+    if (!hospital) {
+      throw new ApiError(404, 'Hospital not found.');
+    }
+
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 15));
+    const skip = (page - 1) * limit;
+
+    // Strict Hospital Ownership and Data Isolation
+    const filter = {
+      $or: [
+        { hospitalId: hospital._id },
+        { hospital: hospital.name },
+        { hospital: hospital.hospitalDetails?.facilityName }
+      ]
+    };
+
+    if (query.status && query.status !== 'ALL') {
+      filter.status = query.status.toUpperCase();
+    }
+
+    if (query.priority && query.priority !== 'ALL') {
+      filter.priority = query.priority.toUpperCase();
+    }
+
+    if (query.bloodGroup && query.bloodGroup !== 'ALL') {
+      filter.bloodGroup = query.bloodGroup.toUpperCase();
+    }
+
+    if (query.search) {
+      const searchRegex = new RegExp(query.search.trim(), 'i');
+      filter.$and = [
+        {
+          $or: [
+            { requestId: searchRegex },
+            { patientName: searchRegex },
+            { contactPhone: searchRegex }
+          ]
+        }
+      ];
+    }
+
+    const [requests, total] = await Promise.all([
+      BloodRequest.find(filter)
+        .populate('patient', 'name email phone')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      BloodRequest.countDocuments(filter)
+    ]);
+
+    return {
+      requests,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
+  }
+
+  /**
+   * Hospital-Scoped Single Blood Request Details (Module 3)
+   */
+  async getHospitalRequestById(hospitalId, requestId) {
+    const hospital = await User.findById(hospitalId);
+    if (!hospital) {
+      throw new ApiError(404, 'Hospital not found.');
+    }
+
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(requestId);
+    const query = isObjectId ? { _id: requestId } : { requestId };
+
+    const request = await BloodRequest.findOne(query)
+      .populate('patient', 'name email phone')
+      .populate('matchedDonors.donor', 'name email phone bloodGroup city')
+      .lean();
+
+    if (!request) {
+      throw new ApiError(404, 'Blood request not found.');
+    }
+
+    // Data isolation validation
+    const isAssigned =
+      (request.hospitalId && request.hospitalId.toString() === hospital._id.toString()) ||
+      request.hospital === hospital.name ||
+      request.hospital === hospital.hospitalDetails?.facilityName;
+
+    if (!isAssigned) {
+      throw new ApiError(403, 'Access Denied: Requisition assigned to another medical facility.');
+    }
+
+    return request;
+  }
+
+  /**
+   * Hospital Status Transition & Administrative Notes (Module 3)
+   */
+  async updateHospitalRequestStatus(hospitalId, requestId, user, payload = {}) {
+    await this.verifyOperationalAccess(hospitalId);
+
+    const hospital = await User.findById(hospitalId);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(requestId);
+    const query = isObjectId ? { _id: requestId } : { requestId };
+
+    const request = await BloodRequest.findOne(query);
+    if (!request) {
+      throw new ApiError(404, 'Blood request not found.');
+    }
+
+    const isAssigned =
+      (request.hospitalId && request.hospitalId.toString() === hospital._id.toString()) ||
+      request.hospital === hospital.name ||
+      request.hospital === hospital.hospitalDetails?.facilityName;
+
+    if (!isAssigned) {
+      throw new ApiError(403, 'Access Denied: You cannot modify requisitions for another hospital.');
+    }
+
+    const { status, notes = '', rejectionReason = '', unitsFulfilled } = payload;
+    if (!status) {
+      throw new ApiError(400, 'Status is required.');
+    }
+
+    if (!request.canTransitionTo(status)) {
+      const allowed = VALID_STATUS_TRANSITIONS[request.status] || [];
+      throw new ApiError(
+        400,
+        `Invalid status transition from '${request.status}' to '${status}'. Allowed: [${allowed.join(', ') || 'Terminal State'}]`
+      );
+    }
+
+    const prevStatus = request.status;
+    request.status = status;
+
+    if (status === REQUEST_STATUS.REJECTED) {
+      request.rejectionReason = rejectionReason || notes || 'Rejected by hospital administrator.';
+    }
+
+    if (unitsFulfilled !== undefined) {
+      request.unitsFulfilled = Math.max(0, parseInt(unitsFulfilled, 10) || 0);
+    } else if (status === REQUEST_STATUS.FULFILLED && request.unitsFulfilled === 0) {
+      request.unitsFulfilled = request.unitsRequired;
+    }
+
+    request.statusHistory.push({
+      status,
+      changedBy: user._id,
+      changedAt: new Date(),
+      note: notes || (status === REQUEST_STATUS.REJECTED ? request.rejectionReason : `Status updated to ${status} by hospital staff.`)
+    });
+
+    await request.save();
+
+    await AuditLog.record({
+      actor: user,
+      action: AUDIT_ACTIONS.REQUEST_STATUS_CHANGE,
+      targetResource: 'BloodRequest',
+      targetId: request._id,
+      targetIdentifier: request.requestId,
+      details: {
+        previousStatus: prevStatus,
+        newStatus: status,
+        notes: notes || rejectionReason,
+        hospital: hospital.name
+      }
+    });
+
+    try {
+      await notificationService.createNotification({
+        recipient: request.patient,
+        type: status === REQUEST_STATUS.FULFILLED ? NOTIFICATION_TYPES.REQUEST_FULFILLED : NOTIFICATION_TYPES.REQUEST_STATUS_UPDATED,
+        title: `Requisition ${request.requestId} Updated`,
+        message: `Your blood requisition status has been updated to ${status} by ${hospital.hospitalDetails?.facilityName || hospital.name}.`,
+        data: { requestId: request._id, status }
+      });
+    } catch {
+      // Non-fatal
+    }
+
+    return request;
+  }
+
+  /**
+   * Donor Coordination Candidate Discovery (Module 4)
+   * Enforces safety notice: Never present donor ranking as medical compatibility approval.
+   */
+  async getHospitalRequestDonors(hospitalId, requestId) {
+    const hospital = await User.findById(hospitalId);
+    if (!hospital) {
+      throw new ApiError(404, 'Hospital not found.');
+    }
+
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(requestId);
+    const query = isObjectId ? { _id: requestId } : { requestId };
+
+    const request = await BloodRequest.findOne(query);
+    if (!request) {
+      throw new ApiError(404, 'Blood request not found.');
+    }
+
+    const isAssigned =
+      (request.hospitalId && request.hospitalId.toString() === hospital._id.toString()) ||
+      request.hospital === hospital.name ||
+      request.hospital === hospital.hospitalDetails?.facilityName;
+
+    if (!isAssigned) {
+      throw new ApiError(403, 'Access Denied: Requisition assigned to another medical facility.');
+    }
+
+    const matchingData = await matchingService.runMatching(request._id);
+
+    return {
+      ...matchingData,
+      clinicalSafetyNotice:
+        'CLINICAL ADVISORY: Algorithmic donor matching and biological ranking criteria represent screening aids only and do NOT constitute certified clinical compatibility or transfusion authorization. The hospital clinical team and transfusion laboratory must independently perform ABO/Rh crossmatching, serological screening, and donor qualification prior to transfusion.'
+    };
+  }
+
+  /**
+   * Donor Coordination Outreach Dispatch (Module 4)
+   */
+  async coordinateDonorOutreach(hospitalId, requestId, user, payload = {}) {
+    await this.verifyOperationalAccess(hospitalId);
+
+    const hospital = await User.findById(hospitalId);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(requestId);
+    const query = isObjectId ? { _id: requestId } : { requestId };
+
+    const request = await BloodRequest.findOne(query);
+    if (!request) {
+      throw new ApiError(404, 'Blood request not found.');
+    }
+
+    const isAssigned =
+      (request.hospitalId && request.hospitalId.toString() === hospital._id.toString()) ||
+      request.hospital === hospital.name ||
+      request.hospital === hospital.hospitalDetails?.facilityName;
+
+    if (!isAssigned) {
+      throw new ApiError(403, 'Access Denied: Requisition assigned to another medical facility.');
+    }
+
+    const { donorIds } = payload;
+    if (!Array.isArray(donorIds) || donorIds.length === 0) {
+      throw new ApiError(400, 'Please select at least one eligible donor candidate.');
+    }
+
+    const result = await matchingService.sendInvitations(request._id, donorIds, user);
+
+    await AuditLog.record({
+      actor: user,
+      action: AUDIT_ACTIONS.DONOR_COORDINATION_OUTREACH,
+      targetResource: 'BloodRequest',
+      targetId: request._id,
+      targetIdentifier: request.requestId,
+      details: {
+        donorCount: donorIds.length,
+        hospital: hospital.name
+      }
+    });
+
+    return result;
+  }
+
+  /**
+   * Hospital Analytics & Reports (Module 6)
    */
   async getHospitalAnalytics(hospitalId) {
     const hospital = await User.findById(hospitalId);
     if (!hospital) {
       throw new ApiError(404, 'Hospital not found.');
     }
+
+    const now = new Date();
+    const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const in14Days = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+    const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const requestFilter = {
+      $or: [
+        { hospitalId: hospital._id },
+        { hospital: hospital.name },
+        { hospital: hospital.hospitalDetails?.facilityName }
+      ]
+    };
 
     // 1. Transaction volume breakdown by type
     const transactionTypeStats = await BloodTransaction.aggregate([
@@ -773,11 +1163,61 @@ class HospitalService {
       }
     ]);
 
+    // 3. Current inventory levels by blood group
+    const inventoryDocs = await BloodInventory.find({ hospital: hospitalId }).lean();
+    const inventoryTrends = inventoryDocs.map((inv) => ({
+      bloodGroup: inv.bloodGroup,
+      unitsAvailable: inv.unitsAvailable,
+      unitsReserved: inv.unitsReserved,
+      lowStockThreshold: inv.lowStockThreshold,
+      isLowStock: inv.unitsAvailable <= inv.lowStockThreshold
+    }));
+
+    // 4. Request Volume & Fulfillment Rate
+    const [totalReqs, pendingReqs, approvedReqs, fulfilledReqs, rejectedReqs] = await Promise.all([
+      BloodRequest.countDocuments(requestFilter),
+      BloodRequest.countDocuments({ ...requestFilter, status: REQUEST_STATUS.PENDING }),
+      BloodRequest.countDocuments({ ...requestFilter, status: REQUEST_STATUS.APPROVED }),
+      BloodRequest.countDocuments({ ...requestFilter, status: REQUEST_STATUS.FULFILLED }),
+      BloodRequest.countDocuments({ ...requestFilter, status: REQUEST_STATUS.REJECTED })
+    ]);
+
+    const completedReqs = fulfilledReqs + rejectedReqs;
+    const fulfillmentRate = completedReqs > 0 ? Math.round((fulfilledReqs / completedReqs) * 100) : 100;
+
+    // 5. Expiring Stock Report
+    const [expiring7d, expiring14d, expiring30d] = await Promise.all([
+      BloodStock.countDocuments({ hospital: hospitalId, status: STOCK_BATCH_STATUS.AVAILABLE, expiryDate: { $gte: now, $lte: in7Days } }),
+      BloodStock.countDocuments({ hospital: hospitalId, status: STOCK_BATCH_STATUS.AVAILABLE, expiryDate: { $gte: now, $lte: in14Days } }),
+      BloodStock.countDocuments({ hospital: hospitalId, status: STOCK_BATCH_STATUS.AVAILABLE, expiryDate: { $gte: now, $lte: in30Days } })
+    ]);
+
+    const expiringBatches = await BloodStock.find({
+      hospital: hospitalId,
+      status: STOCK_BATCH_STATUS.AVAILABLE,
+      expiryDate: { $gte: now, $lte: in14Days }
+    }).sort({ expiryDate: 1 }).limit(10).lean();
+
     return {
       hospitalId,
       hospitalName: hospital.name,
       summary: transactionTypeStats,
       distributionByGroup: groupDistribution,
+      inventoryTrends,
+      requestVolume: {
+        total: totalReqs,
+        pending: pendingReqs,
+        approved: approvedReqs,
+        fulfilled: fulfilledReqs,
+        rejected: rejectedReqs,
+        fulfillmentRate
+      },
+      expiringStockReport: {
+        expiring7d,
+        expiring14d,
+        expiring30d,
+        batches: expiringBatches
+      },
       generatedAt: new Date()
     };
   }
