@@ -5,6 +5,7 @@ import {
   PlusCircle,
   History,
   Hospital,
+  Mail,
   X
 } from 'lucide-react';
 import BloodRequestForm from './BloodRequestForm';
@@ -12,9 +13,53 @@ import PatientRequestHistory from './PatientRequestHistory';
 import HospitalDashboard from './HospitalDashboard';
 import RequestDetailsModal from './RequestDetailsModal';
 import MatchingDonorsModal from './MatchingDonorsModal';
+import DonorInvitationsList from './DonorInvitationsList';
 import Toast from './Toast';
 
 // High-fidelity initial demo records for zero-friction client preview
+const INITIAL_DEMO_INVITATIONS = [
+  {
+    _id: 'inv_001',
+    request: {
+      _id: 'req_001',
+      requestId: 'BLR-2026-CR88',
+      patientName: 'Eleanor Vance',
+      bloodGroup: 'O-',
+      unitsRequired: 3,
+      hospital: 'Metro Trauma Center',
+      city: 'Metropolis',
+      priority: 'CRITICAL',
+      requiredDate: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+    },
+    priority: 'CRITICAL',
+    status: 'INVITED',
+    invitedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+    expiresAt: new Date(Date.now() + 11.5 * 60 * 60 * 1000).toISOString(),
+    compatibilityDetails: { compatibleBloodGroup: 'O-', isExactMatch: true, isSameCity: true }
+  },
+  {
+    _id: 'inv_002',
+    request: {
+      _id: 'req_002',
+      requestId: 'BLR-2026-AB14',
+      patientName: 'Marcus Bennett',
+      bloodGroup: 'A+',
+      unitsRequired: 2,
+      hospital: 'St. Jude General Hospital',
+      city: 'Metropolis',
+      priority: 'HIGH',
+      requiredDate: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
+    },
+    priority: 'HIGH',
+    status: 'ACCEPTED',
+    invitedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    expiresAt: new Date(Date.now() + 21 * 60 * 60 * 1000).toISOString(),
+    respondedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+    responseNotes: 'Will arrive at blood bank by 2 PM for crossmatching.',
+    compatibilityDetails: { compatibleBloodGroup: 'A+', isExactMatch: true, isSameCity: true }
+  }
+];
+
 const INITIAL_DEMO_REQUESTS = [
   {
     _id: 'req_001',
@@ -80,8 +125,9 @@ const INITIAL_DEMO_REQUESTS = [
 ];
 
 export default function BloodRequestPortal({ isOpen, onClose, initialTab = 'create', defaultBloodGroup = 'O+' }) {
-  const [activeTab, setActiveTab] = useState(initialTab); // 'create' | 'history' | 'hospital'
+  const [activeTab, setActiveTab] = useState(initialTab); // 'create' | 'history' | 'hospital' | 'invitations'
   const [requests, setRequests] = useState(INITIAL_DEMO_REQUESTS);
+  const [invitations, setInvitations] = useState(INITIAL_DEMO_INVITATIONS);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [matchingModalData, setMatchingModalData] = useState(null);
   const [toasts, setToasts] = useState([]);
@@ -286,6 +332,96 @@ export default function BloodRequestPortal({ isOpen, onClose, initialTab = 'crea
     });
   };
 
+  // 7. Accept Donor Invitation Handler
+  const handleAcceptInvitation = async (invId, notes) => {
+    setInvitations((prev) =>
+      prev.map((inv) => {
+        if (inv._id === invId) {
+          return {
+            ...inv,
+            status: 'ACCEPTED',
+            respondedAt: new Date().toISOString(),
+            responseNotes: notes
+          };
+        }
+        return inv;
+      })
+    );
+    addToast(
+      'success',
+      'Donation Invitation Accepted!',
+      'Thank you! The hospital transfusion center has been notified to schedule crossmatching.'
+    );
+  };
+
+  // 8. Reject Donor Invitation Handler
+  const handleRejectInvitation = async (invId, notes) => {
+    setInvitations((prev) =>
+      prev.map((inv) => {
+        if (inv._id === invId) {
+          return {
+            ...inv,
+            status: 'REJECTED',
+            respondedAt: new Date().toISOString(),
+            responseNotes: notes
+          };
+        }
+        return inv;
+      })
+    );
+    addToast(
+      'info',
+      'Invitation Declined',
+      'The request will be automatically dispatched to other compatible voluntary donors.'
+    );
+  };
+
+  // 9. Hospital Dispatch Invitation Handler
+  const handleDispatchInvitation = (donorId) => {
+    if (!matchingModalData?.request) return;
+    const req = matchingModalData.request;
+
+    const newInv = {
+      _id: `inv_${Date.now()}`,
+      request: req,
+      donor: { _id: donorId },
+      priority: req.priority || 'NORMAL',
+      status: 'INVITED',
+      invitedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      compatibilityDetails: {
+        compatibleBloodGroup: req.bloodGroup,
+        isExactMatch: true,
+        isSameCity: true
+      }
+    };
+
+    setInvitations((prev) => [newInv, ...prev]);
+
+    // Update BloodRequest status to MATCHED if APPROVED
+    setRequests((prev) =>
+      prev.map((r) => {
+        if (r._id === req._id && r.status === 'APPROVED') {
+          return {
+            ...r,
+            status: 'MATCHED',
+            statusHistory: [
+              ...r.statusHistory,
+              { status: 'MATCHED', changedAt: new Date().toISOString(), note: 'Hospital dispatched donor invitation' }
+            ]
+          };
+        }
+        return r;
+      })
+    );
+
+    addToast(
+      'success',
+      'Invitation Dispatched!',
+      'Emergency invitation transmitted to donor with SMS/Email alerts and 24h response window.'
+    );
+  };
+
   // Filter requests for Hospital Dashboard
   const filteredHospitalRequests = requests.filter((r) => {
     if (searchTerm) {
@@ -336,11 +472,11 @@ export default function BloodRequestPortal({ isOpen, onClose, initialTab = 'crea
                   Life<span className="text-[#B91C35]">Link</span>
                 </span>
                 <span className="text-[10px] bg-red-950/90 text-red-300 font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-red-500/30">
-                  Phase 4 Requisition Engine
+                  Phase 5 Matching & Notification Engine
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Emergency Blood Request Management & Clinical Dispatch Portal
+                Biological Donor Matching, Invitation Management & Real-Time Alerts
               </p>
             </div>
           </div>
@@ -350,7 +486,7 @@ export default function BloodRequestPortal({ isOpen, onClose, initialTab = 'crea
             <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs font-bold">
               <button
                 onClick={() => setActiveTab('create')}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition ${
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition cursor-pointer ${
                   activeTab === 'create'
                     ? 'bg-[#B91C35] text-white shadow-xs'
                     : 'text-slate-400 hover:text-white'
@@ -362,7 +498,7 @@ export default function BloodRequestPortal({ isOpen, onClose, initialTab = 'crea
 
               <button
                 onClick={() => setActiveTab('history')}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition ${
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition cursor-pointer ${
                   activeTab === 'history'
                     ? 'bg-[#B91C35] text-white shadow-xs'
                     : 'text-slate-400 hover:text-white'
@@ -373,8 +509,22 @@ export default function BloodRequestPortal({ isOpen, onClose, initialTab = 'crea
               </button>
 
               <button
+                onClick={() => setActiveTab('invitations')}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition cursor-pointer ${
+                  activeTab === 'invitations'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Mail size={14} />
+                <span>
+                  Invitations ({invitations.filter((i) => i.status === 'INVITED').length})
+                </span>
+              </button>
+
+              <button
                 onClick={() => setActiveTab('hospital')}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition ${
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition cursor-pointer ${
                   activeTab === 'hospital'
                     ? 'bg-slate-800 text-white shadow-xs border border-slate-700'
                     : 'text-slate-400 hover:text-white'
@@ -431,6 +581,25 @@ export default function BloodRequestPortal({ isOpen, onClose, initialTab = 'crea
                 onViewDetails={(req) => setSelectedRequest(req)}
                 onCancelRequest={handleCancelRequest}
                 onCreateNew={() => setActiveTab('create')}
+              />
+            </div>
+          )}
+
+          {activeTab === 'invitations' && (
+            <div className="max-w-4xl mx-auto">
+              <div className="mb-6">
+                <h3 className="text-xl font-bold text-slate-900 tracking-tight">
+                  Emergency Donation Invitations
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Review direct hospital matching invitations, confirm availability, and schedule clinical crossmatching
+                </p>
+              </div>
+
+              <DonorInvitationsList
+                invitations={invitations}
+                onAcceptInvitation={handleAcceptInvitation}
+                onRejectInvitation={handleRejectInvitation}
               />
             </div>
           )}
@@ -497,9 +666,7 @@ export default function BloodRequestPortal({ isOpen, onClose, initialTab = 'crea
           request={matchingModalData?.request}
           matchingData={matchingModalData?.matchingData}
           onClose={() => setMatchingModalData(null)}
-          onNotifyDonor={(donorId) => {
-            addToast('success', 'Emergency Alert Dispatched', `Compatible donor ${donorId} notified via secure SMS/App routing.`);
-          }}
+          onNotifyDonor={handleDispatchInvitation}
         />
 
         {/* Floating Toasts */}

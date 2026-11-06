@@ -181,27 +181,38 @@ export default function MatchingDonorsModal({
 
                       {/* Action Button */}
                       <div className="sm:self-center shrink-0">
-                        <button
-                          onClick={() => handleNotify(donor._id)}
-                          disabled={isNotified}
-                          className={`w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs transition flex items-center justify-center gap-2 ${
-                            isNotified
-                              ? 'bg-emerald-100 text-emerald-800 cursor-default'
-                              : 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm'
-                          }`}
-                        >
-                          {isNotified ? (
-                            <>
-                              <CheckCircle2 size={14} />
-                              <span>Dispatch Alert Sent</span>
-                            </>
-                          ) : (
-                            <>
-                              <Send size={14} />
-                              <span>Dispatch Emergency Alert</span>
-                            </>
-                          )}
-                        </button>
+                        {matchDetails.invitationStatus === 'ACCEPTED' ? (
+                          <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200">
+                            <CheckCircle2 size={14} />
+                            <span>Accepted Invitation</span>
+                          </div>
+                        ) : matchDetails.invitationStatus === 'REJECTED' ? (
+                          <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-medium">
+                            <span>Declined</span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleNotify(donor._id)}
+                            disabled={isNotified || matchDetails.invitationStatus === 'INVITED'}
+                            className={`w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer ${
+                              isNotified || matchDetails.invitationStatus === 'INVITED'
+                                ? 'bg-purple-100 text-purple-900 border border-purple-200 cursor-default'
+                                : 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm'
+                            }`}
+                          >
+                            {isNotified || matchDetails.invitationStatus === 'INVITED' ? (
+                              <>
+                                <CheckCircle2 size={14} className="text-purple-700" />
+                                <span>Invitation Dispatched</span>
+                              </>
+                            ) : (
+                              <>
+                                <Send size={14} />
+                                <span>Send Invitation</span>
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
