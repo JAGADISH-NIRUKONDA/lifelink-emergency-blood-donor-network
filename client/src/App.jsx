@@ -13,6 +13,7 @@ import Footer from './components/Footer';
 import ActionModal from './components/ActionModal';
 import BloodRequestPortal from './components/bloodRequests/BloodRequestPortal';
 import NotificationCenterModal from './components/notifications/NotificationCenterModal';
+import AdminPortal from './components/admin/AdminPortal';
 
 const INITIAL_APP_NOTIFICATIONS = [
   {
@@ -61,6 +62,7 @@ function App() {
   });
 
   const [notificationCenterOpen, setNotificationCenterOpen] = useState(false);
+  const [adminPortalOpen, setAdminPortalOpen] = useState(false);
   const [notifications, setNotifications] = useState(INITIAL_APP_NOTIFICATIONS);
 
   const openModal = (mode = 'request', defaultBloodGroup = '') => {
@@ -102,6 +104,7 @@ function App() {
         onOpenAuthModal={(mode) => openModal(mode || 'login')}
         onOpenBloodPortal={(tab) => openBloodPortal(tab || 'hospital')}
         onOpenNotificationCenter={() => setNotificationCenterOpen(true)}
+        onOpenAdminPortal={() => setAdminPortalOpen(true)}
       />
 
       <main>
@@ -188,6 +191,12 @@ function App() {
           setNotifications((prev) => prev.filter((n) => n._id !== id));
         }}
         onOpenPortal={(tab) => openBloodPortal(tab)}
+      />
+
+      {/* Phase 7: Super Admin Dashboard & Analytics Portal */}
+      <AdminPortal
+        isOpen={adminPortalOpen}
+        onClose={() => setAdminPortalOpen(false)}
       />
     </div>
   );

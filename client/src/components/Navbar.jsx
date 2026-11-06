@@ -13,7 +13,7 @@ const navItems = [
   { id: 'contact', label: 'Contact', href: '#contact' },
 ];
 
-export default function Navbar({ onOpenAuthModal, onOpenBloodPortal, onOpenNotificationCenter }) {
+export default function Navbar({ onOpenAuthModal, onOpenBloodPortal, onOpenNotificationCenter, onOpenAdminPortal }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -135,6 +135,14 @@ export default function Navbar({ onOpenAuthModal, onOpenBloodPortal, onOpenNotif
           </button>
 
           <button
+            onClick={() => onOpenAdminPortal && onOpenAdminPortal()}
+            className="hidden xl:inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#B91C35] px-3.5 py-2 rounded-full border border-slate-200 hover:border-red-200 bg-white hover:bg-red-50/50 transition shadow-2xs cursor-pointer"
+          >
+            <ShieldCheck size={14} className="text-[#B91C35]" />
+            <span>Admin Console</span>
+          </button>
+
+          <button
             onClick={() => onOpenAuthModal('login')}
             className="hidden sm:inline-flex items-center gap-2 bg-[#B91C35] hover:bg-[#9E152C] text-white text-sm font-semibold px-5 py-2.5 rounded-full transition-all shadow-sm hover:shadow-md hover:shadow-red-900/15 active:scale-95 cursor-pointer"
           >
@@ -197,6 +205,16 @@ export default function Navbar({ onOpenAuthModal, onOpenBloodPortal, onOpenNotif
                   className="w-full bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold py-2.5 rounded-xl transition text-center shadow-xs"
                 >
                   Hospital Command Desk
+                </button>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    if (onOpenAdminPortal) onOpenAdminPortal();
+                  }}
+                  className="w-full bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold py-2.5 rounded-xl transition text-center shadow-xs flex items-center justify-center gap-2"
+                >
+                  <ShieldCheck size={16} className="text-red-400" />
+                  <span>Super Admin Console</span>
                 </button>
                 <button
                   onClick={() => {
