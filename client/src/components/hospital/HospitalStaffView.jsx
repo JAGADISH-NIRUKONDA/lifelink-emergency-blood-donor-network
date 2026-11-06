@@ -22,6 +22,7 @@ const STAFF_ROLES = [
 
 export default function HospitalStaffView({
   staff = [],
+  isVerified = true,
   onAddStaff,
   onRemoveStaff
 }) {
@@ -68,13 +69,24 @@ export default function HospitalStaffView({
         </div>
 
         <button
+          disabled={!isVerified}
           onClick={() => setModalOpen(true)}
-          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+          className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xs ${
+            isVerified
+              ? 'bg-purple-600 hover:bg-purple-700 text-white cursor-pointer'
+              : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+          }`}
         >
           <Plus size={15} />
           <span>Add Staff Member</span>
         </button>
       </div>
+
+      {!isVerified && (
+        <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-300 text-xs text-amber-900">
+          Staff roster modifications are locked for unverified medical centers until accreditation is granted.
+        </div>
+      )}
 
       {/* Staff Grid */}
       {staff.length === 0 ? (

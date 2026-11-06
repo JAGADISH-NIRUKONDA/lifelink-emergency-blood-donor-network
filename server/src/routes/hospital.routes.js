@@ -115,5 +115,37 @@ router.get(
   HospitalController.getAnalytics
 );
 
+// Emergency Blood Requests Management (Module 3)
+router.get(
+  '/requests',
+  authorizeRoles(ROLES.HOSPITAL, ROLES.ADMIN),
+  HospitalController.getHospitalRequests
+);
+
+router.get(
+  '/requests/:id',
+  authorizeRoles(ROLES.HOSPITAL, ROLES.ADMIN),
+  HospitalController.getHospitalRequestById
+);
+
+router.patch(
+  '/requests/:id/status',
+  authorizeRoles(ROLES.HOSPITAL, ROLES.ADMIN),
+  HospitalController.updateHospitalRequestStatus
+);
+
+// Donor Coordination (Module 4)
+router.get(
+  '/requests/:id/donors',
+  authorizeRoles(ROLES.HOSPITAL, ROLES.ADMIN),
+  HospitalController.getHospitalRequestDonors
+);
+
+router.post(
+  '/requests/:id/invite',
+  authorizeRoles(ROLES.HOSPITAL, ROLES.ADMIN),
+  HospitalController.coordinateDonorOutreach
+);
+
 export default router;
 

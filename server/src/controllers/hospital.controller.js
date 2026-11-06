@@ -192,5 +192,61 @@ export class HospitalController {
       next(error);
     }
   }
+
+  // 8. Emergency Blood Requests Management (Module 3)
+  static async getHospitalRequests(req, res, next) {
+    try {
+      const hospitalId = HospitalController.getTargetHospitalId(req);
+      const result = await hospitalService.getHospitalRequests(hospitalId, req.query);
+      return res.status(200).json(new ApiResponse(200, result, 'Hospital incoming requisitions retrieved.'));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getHospitalRequestById(req, res, next) {
+    try {
+      const hospitalId = HospitalController.getTargetHospitalId(req);
+      const { id } = req.params;
+      const result = await hospitalService.getHospitalRequestById(hospitalId, id);
+      return res.status(200).json(new ApiResponse(200, result, 'Requisition details retrieved.'));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updateHospitalRequestStatus(req, res, next) {
+    try {
+      const hospitalId = HospitalController.getTargetHospitalId(req);
+      const { id } = req.params;
+      const result = await hospitalService.updateHospitalRequestStatus(hospitalId, id, req.user, req.body);
+      return res.status(200).json(new ApiResponse(200, result, `Requisition status updated to ${result.status}.`));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // 9. Donor Coordination (Module 4)
+  static async getHospitalRequestDonors(req, res, next) {
+    try {
+      const hospitalId = HospitalController.getTargetHospitalId(req);
+      const { id } = req.params;
+      const result = await hospitalService.getHospitalRequestDonors(hospitalId, id);
+      return res.status(200).json(new ApiResponse(200, result, 'Compatible donor candidates identified.'));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async coordinateDonorOutreach(req, res, next) {
+    try {
+      const hospitalId = HospitalController.getTargetHospitalId(req);
+      const { id } = req.params;
+      const result = await hospitalService.coordinateDonorOutreach(hospitalId, id, req.user, req.body);
+      return res.status(200).json(new ApiResponse(200, result, 'Donor outreach invitations dispatched successfully.'));
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
